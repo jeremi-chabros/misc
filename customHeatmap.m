@@ -204,7 +204,7 @@ set(gca,...
     'xcolor', 'none',...
     'ycolor', 'none',...
     'color', 'none');
-
-set(gcf, 'Position', [300 300 600 625]);
+axis square
+set(gcf, 'Position', [300 300 600 600]);
 
 F = gcf;
