@@ -31,12 +31,12 @@ function [F, cbar] = customHeatmap(X, args)
 %       'markerSize', 2000,...
 %       'marker', 'o',...
 %       'edgeColor', 'none');
-% 
+%
 %    title('Spiking frequency heatmap',...
 %        'fontsize', 14);
 %    ylabel(cbar, {[''] ['Spiking frequency [Hz]']}, 'fontsize', 12);
 
-% Author: 
+% Author:
 %   Jeremy Chabros, University of Cambridge, 2020
 %   email: jjc80@cam.ac.uk
 %   github.com/jeremi-chabros
@@ -51,7 +51,7 @@ function [F, cbar] = customHeatmap(X, args)
 % 'matter','turbid','topo','speed','amp','tempo','rain'
 %
 % See: https://uk.mathworks.com/matlabcentral/fileexchange/57773-cmocean-perceptually-uniform-colormaps
-% 
+%
 %--------------------------------------------------------------------------
 % Scientific Colour Maps package
 % Scientific colour maps are stored as .mat files
@@ -81,9 +81,9 @@ arguments
 end
 
 channels = [47;48;46;45;38;37;28;36;27;17;26;16;35;25;15;14;24;34;13;...
-            23;12;22;33;21;32;31;44;43;41;42;52;51;53;54;61;62;71;63;...
-            72;82;73;83;64;74;84;85;75;65;86;76;87;77;66;78;67;68;55;...
-            56;58;57];
+    23;12;22;33;21;32;31;44;43;41;42;52;51;53;54;61;62;71;63;...
+    72;82;73;83;64;74;84;85;75;65;86;76;87;77;66;78;67;68;55;...
+    56;58;57];
 
 % Reference and grounded electrodes XY coords
 ref = 15;
@@ -147,18 +147,18 @@ for i = 1:length(channels)
     if n == ref
         
         f = scatter(dec, unit, args.markerSize, args.marker);
-%         textscatter(dec, unit, "ref");
+        %         textscatter(dec, unit, "ref");
         f.MarkerFaceColor = 'none';
         f.MarkerEdgeColor = 'none';
-%         f.MarkerEdgeColor = [0.5 0.5 0.5];
+        %         f.MarkerEdgeColor = [0.5 0.5 0.5];
         
     elseif ismember(n, grd)
         
         f = scatter(dec, unit, args.markerSize, args.marker);
-%         textscatter(dec, unit, "grd");
+        %         textscatter(dec, unit, "grd");
         f.MarkerFaceColor = 'none';
         f.MarkerEdgeColor = 'none';
-%         f.MarkerEdgeColor = [0.5 0.5 0.5];
+        %         f.MarkerEdgeColor = [0.5 0.5 0.5];
         
     else
         
@@ -193,8 +193,9 @@ cbar.TickDirection = 'out';
 cbar.Box = 'off';
 cbar.LineWidth = 1;
 if isfield(args, 'cbarTitle')
-set(get(cbar,'label'),'string',args.cbarTitle);
+    set(get(cbar,'label'),'string',args.cbarTitle);
 end
+
 % Set figure size and remove axes
 
 xlim([0 9]);
@@ -204,7 +205,7 @@ set(gca,...
     'xcolor', 'none',...
     'ycolor', 'none',...
     'color', 'none');
-axis square
-set(gcf, 'Position', [300 300 600 600]);
 
+set(gcf, 'Position', [300 300 600 600]);
+axis square
 F = gcf;
