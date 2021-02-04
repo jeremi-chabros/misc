@@ -3,6 +3,8 @@ function dsMatrix = downSample(mat, option, dsFactor, method, vst)
 %----------
 % INPUT
 % mat      - [n x t]  matrix to be downsampled
+% option   - [string] 'nbins' specifies the number of samples to which mat will be downsampled,
+%                      anything else will cause downsampling by dsFactor to [t/dsFactor] samples
 % dsFactor - [scalar] downsampling factor
 % method   - [string] method to be used: 'mean' for bin-wise mean,
 %                     'sum' for within-bin sum
