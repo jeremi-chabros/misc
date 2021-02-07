@@ -1,17 +1,27 @@
 /*==========================================================
- * arrayProduct.c - example in MATLAB External Interfaces
+ *   sttc.c -  High-performance mex implementation of Spike Time Tiling Coefficient.
+ *   @Author: Jeremy Chabros (2021), https://github.com/jeremi-chabros
  *
- * Multiplies an input scalar (multiplier)
- * times a 1xN matrix (inMatrix)
- * and outputs a 1xN matrix (outMatrix)
- *
- * The calling syntax is:
- *
- *		outMatrix = arrayProduct(multiplier, inMatrix)
- *
- * This is a MEX-file for MATLAB.
- * Copyright 2007-2012 The MathWorks, Inc.
- *
+ *   Originally written by Catherine S Cutts (2014):
+ *   https://github.com/CCutts/Detecting_pairwise_correlations_in_spike_trains/blob/master/spike_time_tiling_coefficient.c
+ *   See the original paper:
+ *   https://www.ncbi.nlm.nih.gov/pubmed/25339742
+
+ 
+* INPUTS 
+    * N1v           | The number of spikes in electrode 1 (double) 
+    * N2v           | The number of spikes in electrode 2 (double)
+    * dtv           | The delay (in seconds) (double) 
+    * Time          | 2 x 1 vector containing the start time and end time 
+    *               | of the recording (seconds), so that Time(2) - Time(1) = length of 
+    *               | recording
+    * spike_times_1 | The spike times in electrode 1 (in seconds)  (vector)
+    * spike_times_2 | the spikes times in electrode 2 (in seconds) (vector)
+
+* OUTPUT
+
+    * tileCoef | The tiling coefficient
+
  *========================================================*/
 
 #include "mex.h"
