@@ -9,18 +9,18 @@
 
  
 * INPUTS 
-    * N1v           | The number of spikes in electrode 1 (double) 
-    * N2v           | The number of spikes in electrode 2 (double)
+    * N1v           | The number of spikes in electrode 1 (int) 
+    * N2v           | The number of spikes in electrode 2 (int)
     * dtv           | The delay (in seconds) (double) 
     * Time          | 2 x 1 vector containing the start time and end time 
     *               | of the recording (seconds), so that Time(2) - Time(1) = length of 
-    *               | recording
-    * spike_times_1 | The spike times in electrode 1 (in seconds)  (vector)
-    * spike_times_2 | the spikes times in electrode 2 (in seconds) (vector)
+    *               | recording (double)
+    * spike_times_1 | The spike times in electrode 1 (in seconds)  (vector of doubles)
+    * spike_times_2 | the spikes times in electrode 2 (in seconds) (vector of doubles)
 
 * OUTPUT
 
-    * tileCoef | The tiling coefficient
+    * tileCoef | The tiling coefficient (double)
 
  *========================================================*/
 
