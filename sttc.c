@@ -6,7 +6,6 @@
  *   https://github.com/CCutts/Detecting_pairwise_correlations_in_spike_trains/blob/master/spike_time_tiling_coefficient.c
  *   See the original paper:
  *   https://www.ncbi.nlm.nih.gov/pubmed/25339742
-
  
 * INPUTS 
     * N1v           | The number of spikes in electrode 1 (int) 
@@ -17,11 +16,8 @@
     *               | recording (double)
     * spike_times_1 | The spike times in electrode 1 (in seconds)  (vector of doubles)
     * spike_times_2 | the spikes times in electrode 2 (in seconds) (vector of doubles)
-
 * OUTPUT
-
     * tileCoef | The tiling coefficient (double)
-
  *========================================================*/
 
 #include "mex.h"

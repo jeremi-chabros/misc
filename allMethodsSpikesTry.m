@@ -1,73 +1,82 @@
 clearvars; clc;
-file = load('200708_slice1_1.mat');
-ttx_file = load('200708_slice1_3_TTX.mat');
+dataPath = '/Users/jeremi/mea/data/PV-ArchT/';
+addpath(dataPath);
+file = load('PAT200219_2C_DIV170001.mat');
+addpath('/Users/jeremi/SpikeDetection-Toolbox/Algorithmen');
+%ttx_file = load('200708_slice1_3_TTX.mat');
 
 %%
-
+spikeTimes = struct;
 global fs duration TP FP FN nSamples
 fs = 25000;
 TP = 0;
 FP = 0;
 FN = 0;
 nSamples = 0;
-duration = length(ttx_file.dat)/fs;
-channel = 14;
+duration = length(file.dat)/fs;
+channel = 55;
 trace_raw = file.dat(1:fs*60, channel);
 % trace = ttx_file.dat(1:fs*60, 12);
 
-Ns = 10;
-multiplier = 3.0;
+Ns = 2;
+multiplier = 3.5;
+wnames = {'mea','bior1.5','bior1.3', 'db2'};
+for wname = wnames
+    good_wname = strrep(wname,'.','p');
 
- [spikeTimes.('mea'), ~, trace] = detectSpikesCWT(...
-    trace_raw, fs, [0.5 1], 'mea', -0.4, Ns, multiplier, 200, 0, ...
-    1, 10, 10);
-
-params.filter = 0;
-in.M = trace;
-in.SaRa = fs;
-%%
-params.filter = 0;
-in.M = trace;
-in.SaRa = fs;
-params.method = 'auto';
-[spikepos1, ~] = SWTTEO(in,params);
-spike_times = [];
-spikeWaveforms = [];
-for i = 1:length(spikepos1)
-    if spikepos1(i)>25
-        bin = trace(spikepos1(i)-25:spikepos1(i)+25);
-        if trace(spikepos1(i))<0
-            spikeWaveforms(:,end+1) = bin;
-            spike_times(end+1) = spikepos1(i);
-        end
-    end
+ [spikeTimes.(good_wname{1}), ~, trace] = detectSpikesCWT(...
+    trace_raw, fs, [0.6 1.2], wname{1}, -0.5, Ns, multiplier, 200, 1, ...
+    3.0, 10, 5);
 end
- [spikeTimes.('swtteo'), ~] = alignPeaks(spike_times, trace, 25,...
-                                                    1, 1, 5, 10);
 
 %%
+% params.filter = 0;
+% in.M = trace;
+% in.SaRa = fs;
+% %
+% params.filter = 0;
+% in.M = trace;
+% in.SaRa = fs;
+% params.method = 'auto';
+% [spikepos1, ~] = SWTTEO(in,params);
+% spike_times = [];
+% spikeWaveforms = [];
+% for i = 1:length(spikepos1)
+%     if spikepos1(i)>25
+%         bin = trace(spikepos1(i)-25:spikepos1(i)+25);
+%         if trace(spikepos1(i))<0
+%             spikeWaveforms(:,end+1) = bin;
+%             spike_times(end+1) = spikepos1(i);
+%         end
+%     end
+% end
+%  [spikeTimes.('swtteo'), ~] = alignPeaks(spike_times, trace, 25,...
+%                                                     1, 1, 10, 10);
+
+%
 
 [frames, ~, threshold] = ...
     detectSpikesThreshold(trace, 3.5, 0.1, fs, 0);
 [spikeTimes.('threshold'), ~] = alignPeaks(find(frames==1), trace, 10,...
                                                     0, 0, 5, 10);
-%%
+%
 spikeTimes.all = [];
 [spikeTimes.('all'), intersect_matrix, unique_idx] = mergeSpikes(spikeTimes);
 [~, spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 25,...
                                                     0, 1, 10, 10);
-%%
+%
+figure
 h = plot(trace-mean(trace), 'k');
 hold on
 methods = fieldnames(spikeTimes);
 col = parula(length(methods)+1);
-for m = 1:length(methods)
+for m = 1:length(methods)-1
     spikepos = spikeTimes.(methods{m});
-    scatter(spikepos, repmat(4*std(trace)-(m+1)*3, length(spikepos), 1), 'v', 'filled',...
+    scatter(spikepos, repmat(4*std(trace)-m, length(spikepos), 1), 'v', 'filled',...
         'markerfacecolor', col(m,:))
 end
 hold on
-yline(threshold, 'r--', "Threshold = " + round(threshold,2) + "\muV");
+yline(-20, 'r--', "Threshold = " + round(-20) + "\muV");
 % Aesthetics
 st = 1;
 en = st+(50*25);
