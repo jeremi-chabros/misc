@@ -1,15 +1,10 @@
-function [all_spikes, intersect_matrix, unique_idx] = mergeSpikes(spike_times)
+function [all_spikes, intersect_matrix, unique_idx] = mergeSpikes(spike_times, option)
 % Description: Merges spike times across detection methods.
 %----------
 % INPUT
-% spike_times - [n x 1 cell] containing for each electrode a structure 
-%                            containing spikes detected by respective methods
-%                            e.g. spike_times{channel}.('method')
-% dsFactor    - [scalar] downsampling factor
-% method      - [string] method to be used: 'mean' for bin-wise mean,
-%                        'sum' for within-bin sum
-% vst         - [bool]   optional flag specifying the variance-stabilizing
-%                        transformation; 1 to use, 0 to ignore
+% spike_times - [n x 1 cell] containing for each electrode a structure
+% option      - [string] specifies merging option: 'all' or 'wavelets'; if
+%                        not specified, defaults to 'all'
 %----------
 % OUTPUT
 % all_spikes  - [struct] with merged spike times appended to spike_times{channel}.('all')
@@ -22,10 +17,26 @@ function [all_spikes, intersect_matrix, unique_idx] = mergeSpikes(spike_times)
 %----------
 % @author JJChabros (jjc80@cam.ac.uk), January 2021
 
+% Define a list of admissible wavelets
+wavelets = {'mea','bior1.5','bior1.3','db2'};
+if ~exist('option', 'var')
+    option = 'all';
+end
 methods = fieldnames(spike_times);
 all_spikes = [];
-for method = 1:numel(methods)
-    all_spikes = union(all_spikes, spike_times.(methods{method}));
+
+switch option
+    case 'all'
+        for method = 1:numel(methods)
+            all_spikes = union(all_spikes, spike_times.(methods{method}));
+        end
+    case 'wavelets'
+        for m = 1:length(wavelets)
+            method = strrep(wavelets{m},'.','p');
+            if isfield(spike_times, method)
+                all_spikes = union(all_spikes, spike_times.(method));
+            end
+        end
 end
 all_spikes = all_spikes';
 

@@ -1,9 +1,7 @@
 clearvars; clc;
-dataPath = '/Users/jeremi/mea/data/PV-ArchT/';
-addpath(dataPath);
-file = load('PAT200219_2C_DIV170001.mat');
-addpath('/Users/jeremi/SpikeDetection-Toolbox/Algorithmen');
-%ttx_file = load('200708_slice1_3_TTX.mat');
+% dataPath = '/Users/jeremi/mea/data/PV-ArchT/';
+% addpath(dataPath);
+file = load('2000803_slice1_1.mat');
 
 %%
 spikeTimes = struct;
@@ -14,26 +12,27 @@ FP = 0;
 FN = 0;
 nSamples = 0;
 duration = length(file.dat)/fs;
-channel = 55;
+channel = randi(60,1);
 trace_raw = file.dat(1:fs*60, channel);
 % trace = ttx_file.dat(1:fs*60, 12);
 
 Ns = 2;
 multiplier = 3.5;
 wnames = {'mea','bior1.5','bior1.3', 'db2'};
+% wnames = {'mea'};
 for wname = wnames
     good_wname = strrep(wname,'.','p');
-
- [spikeTimes.(good_wname{1}), ~, trace] = detectSpikesCWT(...
-    trace_raw, fs, [0.6 1.2], wname{1}, -0.5, Ns, multiplier, 200, 1, ...
-    3.0, 10, 5);
+    
+    [spikeTimes.(good_wname{1}), ~, trace] = detectSpikesCWT(...
+        trace_raw, fs, [0.5 1], wname{1}, -0.43, Ns, multiplier, 200, 1, ...
+        3.0, 10, 10);
 end
 
 %%
 % params.filter = 0;
 % in.M = trace;
 % in.SaRa = fs;
-% %
+%
 % params.filter = 0;
 % in.M = trace;
 % in.SaRa = fs;
@@ -58,25 +57,33 @@ end
 [frames, ~, threshold] = ...
     detectSpikesThreshold(trace, 3.5, 0.1, fs, 0);
 [spikeTimes.('threshold'), ~] = alignPeaks(find(frames==1), trace, 10,...
-                                                    0, 0, 5, 10);
+    1, 3, 10, 10);
 %
 spikeTimes.all = [];
-[spikeTimes.('all'), intersect_matrix, unique_idx] = mergeSpikes(spikeTimes);
-[~, spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 25,...
-                                                    0, 1, 10, 10);
+[spikeTimes.('wavelets'), ~, ~] = mergeSpikes(spikeTimes, 'wavelets');
+% [~, spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 25,...
+%     0, 1, 10, 10);
+[spikeTimes.('all'), intersect_matrix, unique_idx] = mergeSpikes(spikeTimes, 'all');
 %
 figure
+set(gcf,'color','w');
 h = plot(trace-mean(trace), 'k');
 hold on
 methods = fieldnames(spikeTimes);
 col = parula(length(methods)+1);
-for m = 1:length(methods)-1
+for m = 1:length(methods)
+    if strcmp(methods{m}, 'wavelets') || strcmp(methods{m}, 'threshold') ||strcmp(methods{m}, 'all')
     spikepos = spikeTimes.(methods{m});
-    scatter(spikepos, repmat(4*std(trace)-m, length(spikepos), 1), 'v', 'filled',...
+    scatter(spikepos, repmat(6*std(trace)-(m*threshold/-5), length(spikepos), 1), 'v', 'filled',...
         'markerfacecolor', col(m,:))
+    end
 end
+methods = {'threshold', 'wavelets','all'};
 hold on
-yline(-20, 'r--', "Threshold = " + round(-20) + "\muV");
+yl = yline(threshold, 'r--', "Threshold = " + round(threshold,2) + "\muV");
+yl.LabelVerticalAlignment = 'bottom';
+yl.LineWidth = 1.5;
+yl.FontSize = 10;
 % Aesthetics
 st = 1;
 en = st+(50*25);
@@ -84,6 +91,7 @@ xlim([st en]);
 ylim([-6*std(trace) 5*std(trace)])
 pbaspect([5 1 1])
 box off
+title("Electrode " + channel)
 set(get(get(h,'Annotation'),'LegendInformation'),'IconDisplayStyle','off');
 legend(methods, 'location', 'northeastoutside')
 set(gcf, 'position', [300 300 1500 350]);
