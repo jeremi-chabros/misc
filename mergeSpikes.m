@@ -39,25 +39,23 @@ switch option
         end
 end
 all_spikes = all_spikes';
+%%
+% Vectorized operations + Logical indexing strike again...
+% Fast but hard to follow
+all_spikes_bin = zeros(1, max(all_spikes));
+all_spikes_bin(all_spikes)=1;
 
 intersect_matrix = table;
 for method = 1:length(methods)
-    spk_vec = spike_times.(methods{method});
-    intersect_vec = zeros(length(all_spikes),1);
-    for spikeIndex = 1:length(all_spikes)
-        if ismember(all_spikes(spikeIndex), spk_vec)
-            intersect_vec(spikeIndex) = 1;
-        end
-    end
-    intersect_matrix.(methods{method}) = intersect_vec;
+    spk_vec = zeros(size(all_spikes_bin));
+    intersect_vec = zeros(size(all_spikes_bin));
+    spk_vec(spike_times.(methods{method}))=1;
+    intersect_vec = spk_vec.*all_spikes_bin;
+    intersect_matrix.(methods{method}) = intersect_vec';
 end
 
 unique_idx = zeros(1, height(intersect_matrix));
-for spike = 1:height(intersect_matrix)
-    ff = find(intersect_matrix{spike, :} == 1);
-    if length(ff) == 1 && ff ~=0
-        unique_idx(spike) = ff;
-    end
-end
-
+rows = sum(intersect_matrix{:,:},2);
+[~,unique_spks] = find(intersect_matrix{rows==1,:} == 1);
+unique_idx(rows==1) = unique_spks;
 end

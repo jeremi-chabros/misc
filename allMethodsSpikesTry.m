@@ -1,10 +1,10 @@
 clearvars; clc;
-% dataPath = '/Users/jeremi/mea/data/PV-ArchT/';
-% addpath(dataPath);
-file = load('2000803_slice1_1.mat');
-
+dataPath = '/Users/jeremi/mea/data/PV-Ai32/';
+addpath(dataPath);
+addpath(genpath('/Users/jeremi/SpikeDetection-Toolbox'));
+file = load('PVAi32190904_2E_DIV26.mat');
 %%
-spikeTimes = struct;
+
 global fs duration TP FP FN nSamples
 fs = 25000;
 TP = 0;
@@ -12,90 +12,94 @@ FP = 0;
 FN = 0;
 nSamples = 0;
 duration = length(file.dat)/fs;
-channel = randi(60,1);
+
+% channel = randi(60,1);
+channel=15;
 trace_raw = file.dat(1:fs*60, channel);
-% trace = ttx_file.dat(1:fs*60, 12);
+spikeTimes = struct;
 
 Ns = 2;
 multiplier = 3.5;
 wnames = {'mea','bior1.5','bior1.3', 'db2'};
-% wnames = {'mea'};
+Wid = [0.5 1];
+L = -0.43;
+nSpikes = 200;
+ttx = 0;
+minPeakThrMultiplier = 3;
+maxPeakThrMultiplier = 10;
+posPeakThrMultiplier = 10;
+
+% Run CWT spike detection
 for wname = wnames
     good_wname = strrep(wname,'.','p');
     
     [spikeTimes.(good_wname{1}), ~, trace] = detectSpikesCWT(...
-        trace_raw, fs, [0.5 1], wname{1}, -0.43, Ns, multiplier, 200, 1, ...
-        3.0, 10, 10);
+    trace_raw, fs, Wid, wname{1}, L, Ns, multiplier, nSpikes, ttx, ...
+    minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
+
 end
-
 %%
-% params.filter = 0;
-% in.M = trace;
-% in.SaRa = fs;
-%
-% params.filter = 0;
-% in.M = trace;
-% in.SaRa = fs;
-% params.method = 'auto';
-% [spikepos1, ~] = SWTTEO(in,params);
-% spike_times = [];
-% spikeWaveforms = [];
-% for i = 1:length(spikepos1)
-%     if spikepos1(i)>25
-%         bin = trace(spikepos1(i)-25:spikepos1(i)+25);
-%         if trace(spikepos1(i))<0
-%             spikeWaveforms(:,end+1) = bin;
-%             spike_times(end+1) = spikepos1(i);
-%         end
-%     end
-% end
-%  [spikeTimes.('swtteo'), ~] = alignPeaks(spike_times, trace, 25,...
-%                                                     1, 1, 10, 10);
-
-%
-
-[frames, ~, threshold] = ...
-    detectSpikesThreshold(trace, 3.5, 0.1, fs, 0);
+% Run SWTTEO spike detection
+params.filter = 0;
+in.M = trace;
+in.SaRa = fs;
+params.method = 'lambda';
+params.lambda = 430;
+tic
+[spikepos1, ~] = SWTTEO(in,params);
+toc
+[spikeTimes.('swtteo'), ~] = alignPeaks(spikepos1, trace, 10,...
+    1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
+%%
+% Threshold spike detection
+[frames, ~, threshold] = detectSpikesThreshold(trace, 3.5, 0.1, fs, 0);
 [spikeTimes.('threshold'), ~] = alignPeaks(find(frames==1), trace, 10,...
-    1, 3, 10, 10);
-%
-spikeTimes.all = [];
-[spikeTimes.('wavelets'), ~, ~] = mergeSpikes(spikeTimes, 'wavelets');
-% [~, spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 25,...
-%     0, 1, 10, 10);
+    1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
+
+% Merge spikes from all methods
 [spikeTimes.('all'), intersect_matrix, unique_idx] = mergeSpikes(spikeTimes, 'all');
-%
+
+[spikeTimes.('all'), spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 10,...
+    1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
+
+% Merge spikes from wavelets
+[spikeTimes.('wavelets'), ~, ~] = mergeSpikes(spikeTimes, 'wavelets');
+
+
+%% Plot all spike markers
 figure
 set(gcf,'color','w');
-h = plot(trace-mean(trace), 'k');
+h = plot(trace-mean(trace), 'k', 'linewidth', 1);
 hold on
-methods = fieldnames(spikeTimes);
-col = parula(length(methods)+1);
-for m = 1:length(methods)
-    if strcmp(methods{m}, 'wavelets') || strcmp(methods{m}, 'threshold') ||strcmp(methods{m}, 'all')
-    spikepos = spikeTimes.(methods{m});
-    scatter(spikepos, repmat(6*std(trace)-(m*threshold/-5), length(spikepos), 1), 'v', 'filled',...
-        'markerfacecolor', col(m,:))
-    end
+
+admissible = {'threshold', 'wavelets', 'swtteo', 'all'};
+lineStyles=linspecer(4,'colorblind');
+
+for m = 1:length(admissible)
+    spikepos = spikeTimes.(admissible{m});
+    scatter(spikepos, repmat(4*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
+        'markerfacecolor', lineStyles(m,:));
 end
-methods = {'threshold', 'wavelets','all'};
+
 hold on
-yl = yline(threshold, 'r--', "Threshold = " + round(threshold,2) + "\muV");
+yl = yline(threshold, 'magenta--', "Threshold = " + round(threshold,2) + "\muV");
 yl.LabelVerticalAlignment = 'bottom';
 yl.LineWidth = 1.5;
 yl.FontSize = 10;
+
 % Aesthetics
 st = 1;
-en = st+(50*25);
+en = st+(60*25);
 xlim([st en]);
 ylim([-6*std(trace) 5*std(trace)])
 pbaspect([5 1 1])
 box off
 title("Electrode " + channel)
 set(get(get(h,'Annotation'),'LegendInformation'),'IconDisplayStyle','off');
-legend(methods, 'location', 'northeastoutside')
+legend(admissible, 'location', 'northeastoutside')
 set(gcf, 'position', [300 300 1500 350]);
 
+%----------------------------------------
 % Create buttons and callbacks
 set(gcf,'KeyPressFcn',@keys);
 
@@ -107,14 +111,82 @@ prevButton = uicontrol('Position',[500 1 150 30],'String','Previous',...
 
 saveButton = uicontrol('Position',[1325, 120, 100, 30],'String','Save',...
     'Callback', @Save);
-%%
+%----------------------------------------
+%% Plot unique spike markers
+figure
+set(gcf,'color','w');
+h = plot(trace-mean(trace), 'k', 'linewidth', 1);
+hold on
 
-t = tiledlayout(1, length(methods)-1);
+
+
+methods = fieldnames(spikeTimes);
+% unique_counts = table('rownames',methods);
+lineStyles=linspecer(length(methods));
+clear unique_counts
+unique_counts = table('rownames', methods);
+
+
+for m = 1:length(methods)
+    if ~strcmp(methods{m}, 'all')
+    spks = spikeTimes.(methods{m});
+    spikepos = find((unique_idx == m)==1);
+    scatter(spikepos, repmat(4*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
+        'markerfacecolor', lineStyles(m,:));
+    unique_counts{m,1} = length(spikepos);
+    else
+    spikepos = spikeTimes.(methods{m});
+    scatter(spikepos, repmat(4*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
+        'markerfacecolor', lineStyles(m,:));
+    end
+end
+unique_counts.Properties.VariableNames = {'No. unique spikes'};
+unique_counts(end-1:end-2,:) = [];
+hold on
+yl = yline(threshold, 'magenta--', "Threshold = " + round(threshold,2) + "\muV");
+yl.LabelVerticalAlignment = 'bottom';
+yl.LineWidth = 1.5;
+yl.FontSize = 10;
+
+% yl = yline(3/3.5*threshold, 'cyan--', "Threshold = " + round(3/3.5*threshold) + "\muV");
+% yl.LabelVerticalAlignment = 'top';
+% yl.LineWidth = 1.5;
+% yl.FontSize = 10;
+
+% Aesthetics
+st = 1;
+en = st+(60*25);
+xlim([st en]);
+ylim([-6*std(trace) 5*std(trace)])
+pbaspect([5 1 1])
+box off
+title("Electrode " + channel)
+set(get(get(h,'Annotation'),'LegendInformation'),'IconDisplayStyle','off');
+legend(methods, 'location', 'northeastoutside')
+set(gcf, 'position', [300 300 1500 350]);
+
+
+%----------------------------------------
+% Create buttons and callbacks
+set(gcf,'KeyPressFcn',@keys);
+
+nextButton = uicontrol('Position',[700 1 150 30],'String','Next',...
+    'Callback', @Next);
+
+prevButton = uicontrol('Position',[500 1 150 30],'String','Previous',...
+    'Callback', @Prev);
+
+saveButton = uicontrol('Position',[1325, 120, 100, 30],'String','Save',...
+    'Callback', @Save);
+
+%% Plot unique spike waveforms
+methods = fieldnames(spikeTimes);
+t = tiledlayout(1, length(methods));
 t.Title.String = 'Spikes detected uniquely by each method';
-for i = 1:length(methods)
+for i = 1:length(methods)-1
     method = methods{i};
     if ~strcmp(method, 'all')
-        spk_method = find(unique_idx == i);
+        spk_method = find((unique_idx == m)==1);
         spk_waves_method = spikeWaveforms(:, spk_method);
         nexttile
         plot(spk_waves_method, 'linewidth', 0.1, 'color', [0.7 0.7 0.7])
@@ -129,7 +201,8 @@ for i = 1:length(methods)
         yline(threshold, 'r--');
     end
 end
-%%
+
+%% UI functions
 function keys(src, event)
 global TP FP FN nSamples
 switch event.Key
@@ -167,7 +240,7 @@ function Next(nextButton, EventData)
 global duration fs
 lims = get(gca, 'xlim');
 st = lims(2);
-en = st+(50*25);
+en = st+(60*25);
 if en <= duration*fs
     set(gca,'xlim', [st en]);
 end
@@ -176,7 +249,7 @@ end
 function Prev(prevButton, EventData)
 lims = get(gca, 'xlim');
 en = lims(1);
-st = en-(50*25);
+st = en-(60*25);
 if st >= 1
     set(gca,'xlim', [st en]);
 end
