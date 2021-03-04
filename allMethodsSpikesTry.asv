@@ -22,10 +22,10 @@ Ns = 2;
 multiplier = 3.5;
 wnames = {'mea','bior1.5','bior1.3', 'db2'};
 Wid = [0.5 1];
-L = -0.188;
+L = -0.3;
 nSpikes = 200;
 ttx = 0;
-minPeakThrMultiplier = 3.5;
+minPeakThrMultiplier = 3;
 maxPeakThrMultiplier = 10;
 posPeakThrMultiplier = 10;
 
@@ -39,28 +39,32 @@ for wname = wnames
 
 end
 
-% %%
-% threshold = mean(trace) - median(abs(trace-mean(trace)));
-% trace_cropped = trace;
-% plot3(zeros(1,length(trace_cropped)),1:length(trace_cropped),trace_cropped,...
-%     'color', 'k',...
-%     'linewidth', 1);
-% 
-% hold on
-% 
-% lineStyles=linspecer(4,'colorblind');
-% spikepos = spikeTimes.mea;
-% % spikepos = spikepos(intersect(spikepos>10000,spikepos<3000));
-% scatter3( zeros(1,length(spikepos)),spikepos, repmat(4*std(trace)-(1*threshold/-7), length(spikepos), 1), 'v', 'filled',...
-%     'markerfacecolor', lineStyles(1,:));
-% 
-% zlim([-20 20]);
-% ylim([1000, 2000]);
-% ylabel('time');
-% zlabel('voltage');
-% set(gca, 'ydir','reverse',...
-%     'xcolor','none');
-% grid on;
+%%
+threshold = mean(trace) - median(abs(trace-mean(trace)));
+trace_cropped = trace;
+plot3(zeros(1,length(trace_cropped)),1:length(trace_cropped),trace_cropped,...
+    'color', 'k',...
+    'linewidth', 1);
+
+hold on
+
+lineStyles=linspecer(4,'colorblind');
+spikepos = spikeTimes.mea;
+% spikepos = spikepos(intersect(spikepos>10000,spikepos<3000));
+scatter3( zeros(1,length(spikepos)),spikepos, repmat(4*std(trace)-(1*threshold/-7), length(spikepos), 1), 'v', 'filled',...
+    'markerfacecolor', lineStyles(1,:));
+
+zlim([-20 20]);
+ylim([1000, 2000]);
+ylabel('time');
+zlabel('voltage');
+set(gca, 'ydir','reverse',...
+    'xcolor','none');
+grid on;
+
+
+
+
 
 %%
 % Run SWTTEO spike detection
@@ -68,7 +72,7 @@ params.filter = 0;
 in.M = trace;
 in.SaRa = fs;
 params.method = 'lambda';
-params.lambda = 1000;
+params.lambda = 200;
 tic
 [spikepos1, ~] = SWTTEO(in,params);
 toc
@@ -76,24 +80,24 @@ toc
     1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 %%
 % Threshold spike detection
-[frames, ~, threshold] = detectSpikesThreshold(trace, 4, 0.1, fs, 0);
+[frames, ~, threshold] = detectSpikesThreshold(trace, 3.5, 0.1, fs, 0);
 [spikeTimes.('threshold'), ~] = alignPeaks(find(frames==1), trace, 10,...
     1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 
 % Merge spikes from all methods
-[spikeTimes.('all'), unique_idx] = mergeSpikes(spikeTimes, 'all');
+[spikeTimes.('all'), intersect_matrix, unique_idx] = mergeSpikes(spikeTimes, 'all');
 
 [spikeTimes.('all'), spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 10,...
     1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 
 % Merge spikes from wavelets
-[spikeTimes.('wavelets'), ~] = mergeSpikes(spikeTimes, 'wavelets');
+[spikeTimes.('wavelets'), ~, ~] = mergeSpikes(spikeTimes, 'wavelets');
 
 
 %% Plot all spike markers
 
 global bin_ms
-bin_ms = 100;
+bin_ms = 70;
 
 figure
 set(gcf,'color','w');
@@ -141,7 +145,6 @@ saveButton = uicontrol('Position',[1325, 120, 100, 30],'String','Save',...
     'Callback', @Save);
 %----------------------------------------
 %% Plot unique spike markers
-bin_ms = 100;
 figure
 set(gcf,'color','w');
 h = plot(trace-mean(trace), 'k', 'linewidth', 1);
@@ -157,17 +160,16 @@ unique_counts = table('rownames', methods);
 
 
 for m = 1:length(methods)
-    if ~(strcmp(methods{m}, 'all') || strcmp(methods{m}, 'wavelets'))
-        spks = spikeTimes.all;
-        spikepos = find(unique_idx == m);
-        
-        scatter(spks(spikepos), repmat(4*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
-            'markerfacecolor', lineStyles(m,:));
-        unique_counts{m,1} = length(spikepos);
-    elseif strcmp(methods{m}, 'all')
-        spikepos = spikeTimes.(methods{m});
-        scatter(spikepos, repmat(4*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
-            'markerfacecolor', lineStyles(m,:));
+    if ~strcmp(methods{m}, 'all')
+    spks = spikeTimes.(methods{m});
+    spikepos = find((unique_idx == m)==1);
+    scatter(spikepos, repmat(4*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
+        'markerfacecolor', lineStyles(m,:));
+    unique_counts{m,1} = length(spikepos);
+    else
+    spikepos = spikeTimes.(methods{m});
+    scatter(spikepos, repmat(4*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
+        'markerfacecolor', lineStyles(m,:));
     end
 end
 unique_counts.Properties.VariableNames = {'No. unique spikes'};
@@ -216,8 +218,7 @@ t.Title.String = 'Spikes detected uniquely by each method';
 for i = 1:length(methods)-1
     method = methods{i};
     if ~strcmp(method, 'all')
-        
-        spk_method = find(unique_idx == i);
+        spk_method = find((unique_idx == m)==1);
         spk_waves_method = spikeWaveforms(:, spk_method);
         nexttile
         plot(spk_waves_method, 'linewidth', 0.1, 'color', [0.7 0.7 0.7])
@@ -278,7 +279,6 @@ end
 end
 
 function Prev(prevButton, EventData)
-global bin_ms
 lims = get(gca, 'xlim');
 en = lims(1);
 st = en-(bin_ms*25);

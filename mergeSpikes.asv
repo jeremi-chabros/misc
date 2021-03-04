@@ -8,16 +8,14 @@ function [all_spikes, unique_idx] = mergeSpikes(spike_times, option)
 %----------
 % OUTPUT
 % all_spikes  - [struct] with merged spike times appended to spike_times{channel}.('all')
+% intersect_matrix - [table] containing for each method a binary vector specifying which
+%                            spikes were detected by a given method
 % unique_idx - [vector] containing the indexes of spikes detected uniquely by a given method
 
 % TIP: to get spike waveforms corresponding to the merged spike times call e.g.:
 %      [~, spikes] = alignPeaks(spike_times.all, filtered_trace, 25, 0, 1, 10, 10);
 %----------
 % @author JJChabros (jjc80@cam.ac.uk), January 2021
-
-% NOTE: the number in unique_idx corresponds to the position in fieldnames
-%       of spike_times, e.g. if field no. 1 is 'mea', then 1 in unique_idx 
-%       will represent a spike detected uniquely by 'mea' method
 
 % Define a list of admissible wavelets
 switch option
@@ -38,24 +36,27 @@ for method = 1:numel(methods)
 end
 
 all_spikes = all_spikes';
-
+%%
 % Vectorized operations + Logical indexing strike again...
 % Fast but hard to follow
 
-% Pre-allocate
 all_spikes_bin = zeros(1, max(all_spikes));
 all_spikes_bin(all_spikes)=1;
-intersect_matrix = zeros(length(all_spikes_bin),length(methods));
 
+% intersect_matrix = table;
+intersect_matrix = zeros(length(all_spikes_bin),length(methods));
 for method = 1:length(methods)
     spk_vec = zeros(size(all_spikes_bin));
     intersect_vec = zeros(size(all_spikes_bin));
-    spk_vec(spike_times.(methods{method})) = 1;
-    intersect_vec = spk_vec .* all_spikes_bin;
-    intersect_matrix(:,method) = intersect_vec';
+    spk_vec(spike_times.(methods{method}))=1;
+    intersect_vec = spk_vec.*all_spikes_bin;
+    intersect_matrix.(methods{method}) = intersect_vec';
 end
 
-idx = sum(intersect_matrix,2)>0;
-J = intersect_matrix(idx,:);
+I = table2array(intersect_matrix);
+idx = sum(I,2)>0;
+J = I(idx,:);
 unique_idx = sum(J,2);
+% intersect_matrix = array2table(J);
+% intersect_matrix.Properties.VariableNames = methods;
 end
