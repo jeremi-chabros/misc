@@ -16,10 +16,9 @@ function [all_spikes, unique_idx] = mergeSpikes(spike_times, option)
 % @author JJChabros (jjc80@cam.ac.uk), January 2021
 
 % NOTE: the number in unique_idx corresponds to the position in fieldnames
-%       of spike_times, e.g. if field no. 1 is 'mea', then 1 in unique_idx 
+%       of spike_times, e.g. if field no. 1 is 'mea', then 1 in unique_idx
 %       will represent a spike detected uniquely by 'mea' method
 
-% Define a list of admissible wavelets
 switch option
     case 'all'
         methods = fieldnames(spike_times);
@@ -32,19 +31,16 @@ if ~exist('option', 'var')
 end
 
 all_spikes = [];
-
 for method = 1:numel(methods)
     all_spikes = union(all_spikes, spike_times.(methods{method}));
 end
-
 all_spikes = all_spikes';
 
-% Vectorized operations + Logical indexing strike again...
-% Fast but hard to follow
+% Vectorized operations + Logical indexing = Fast but hard to follow
 
 % Pre-allocate
 all_spikes_bin = zeros(1, max(all_spikes));
-all_spikes_bin(all_spikes)=1;
+all_spikes_bin(all_spikes) = 1;
 intersect_matrix = zeros(length(all_spikes_bin),length(methods));
 
 for method = 1:length(methods)

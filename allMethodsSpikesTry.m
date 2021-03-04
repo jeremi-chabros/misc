@@ -14,15 +14,15 @@ nSamples = 0;
 duration = length(file.dat)/fs;
 
 % channel = randi(60,1);
-channel=19;
+channel=12;
 trace_raw = file.dat(1:fs*60, channel);
 spikeTimes = struct;
 
-Ns = 2;
+Ns = 10;
 multiplier = 3.5;
 wnames = {'mea','bior1.5','bior1.3', 'db2'};
 Wid = [0.5 1];
-L = -0.188;
+L = -0.25;
 nSpikes = 200;
 ttx = 0;
 minPeakThrMultiplier = 3.5;
@@ -30,6 +30,7 @@ maxPeakThrMultiplier = 10;
 posPeakThrMultiplier = 10;
 
 % Run CWT spike detection
+tic
 for wname = wnames
     good_wname = strrep(wname,'.','p');
     
@@ -38,7 +39,7 @@ for wname = wnames
     minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 
 end
-
+toc
 % %%
 % threshold = mean(trace) - median(abs(trace-mean(trace)));
 % trace_cropped = trace;
@@ -69,9 +70,7 @@ in.M = trace;
 in.SaRa = fs;
 params.method = 'lambda';
 params.lambda = 1000;
-tic
 [spikepos1, ~] = SWTTEO(in,params);
-toc
 [spikeTimes.('swtteo'), ~] = alignPeaks(spikepos1, trace, 10,...
     1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 %%
@@ -218,11 +217,11 @@ for i = 1:length(methods)-1
     if ~strcmp(method, 'all')
         
         spk_method = find(unique_idx == i);
-        spk_waves_method = spikeWaveforms(:, spk_method);
+        spk_waves_method = spikeWaveforms(spk_method, :);
         nexttile
-        plot(spk_waves_method, 'linewidth', 0.1, 'color', [0.7 0.7 0.7])
+        plot(spk_waves_method', 'linewidth', 0.1, 'color', [0.7 0.7 0.7])
         hold on
-        plot(mean(spk_waves_method,2), 'linewidth', 1.5, 'color', [0 0 0])
+        plot(mean(spk_waves_method), 'linewidth', 1.5, 'color', [0 0 0])
         title({[method],["No. unique spikes: " + length(spk_method)]})
         box off;
         axis tight
