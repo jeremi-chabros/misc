@@ -2,7 +2,7 @@ clearvars; clc;
 dataPath = '/Users/jeremi/mea/data/PV-ArchT/';
 addpath(dataPath);
 addpath(genpath('/Users/jeremi/SpikeDetection-Toolbox'));
-file = load('PAT200219_2C_DIV17.mat');
+file = load('PAT200219_2C_DIV170002.mat');
 %%
 
 global fs duration TP FP FN nSamples
@@ -14,7 +14,7 @@ nSamples = 0;
 duration = length(file.dat)/fs;
 
 % channel = randi(60,1);
-channel = 19;
+channel = 12;
 trace_raw = file.dat(1:fs*60, channel);
 spikeTimes = struct;
 
@@ -38,7 +38,6 @@ for wname = wnames
     [spikeTimes.(good_wname{1}), ~, trace] = detectSpikesCWT(...
     trace_raw, fs, Wid, wname{1}, L, Ns, multiplier, nSpikes, ttx, ...
     minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
-%     length(spikeTimes.(good_wname{1}))
 end
 % toc
 % %%
@@ -66,8 +65,10 @@ end
 
 %%
 % Run SWTTEO spike detection
-params.filter = 1;
-in.M = trace_raw;
+% params.filter = 1;
+% in.M = trace_raw;
+params.filter = 0;
+in.M = trace;
 in.SaRa = fs;
 params.method = 'auto';
 [spikepos1, ~] = SWTTEO(in,params);
@@ -83,14 +84,14 @@ params.method = 'auto';
 unique_idx = [];
 spikeTimes.all = [];
 spikeTimes.wavelets = [];
-[spikeTimes.('all'), unique_idx] = mergeSpikes(spikeTimes, 'all');
+[spikeTimes.('all'), unique_idx, intersect_matrix] = mergeSpikes(spikeTimes, 'all');
 
 [~, spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 10,...
     0, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 
 % Merge spikes from wavelets
 if numel(wnames) > 1
-    [spikeTimes.('wavelets'), ~] = mergeSpikes(spikeTimes, 'wavelets');
+    [spikeTimes.('wavelets'), ~, ~] = mergeSpikes(spikeTimes, 'wavelets');
 end
 
 %% Plot all spike markers
@@ -243,27 +244,91 @@ for i = 1:length(methods)-2
         set(gca, 'xcolor', 'none');
         yl = yline(threshold, 'r--');
         yl.LineWidth = 1.5;
+        if i~=1
+            axis off
+        end
     end
 end
 set(gcf, 'color', 'w');
+set(findall(gcf,'-property','FontSize'),'FontSize', 12);
+set(findall(gcf,'-property','FontName'),'FontName','Roboto')
 
 %% Plot histograms
-tiledlayout(3,3,'tilespacing','none','padding','none')
+% tiledlayout(3,3,'tilespacing','none','padding','none')
 for i = 1:length(methods)-2
     spk_method = find(unique_idx == i);
     spk_waves_method = spikeWaveforms(spk_method, :);
-%     nexttile
     hold on;
     h = histogram(spk_waves_method(:,25),100);
     h.FaceAlpha = 0.5;
     h(i) = gca;
 end
 xlim([-20 0])
-linkaxes(h(:),'x');
 legend(methods{1:end-2},'location','bestoutside');
 set(gcf, 'color','w');
 xlabel('Voltage amplitude (\muV)')
 ylabel('No. entries');
+
+%%
+
+binrng = linspace(min(spikeWaveforms(:,25)),max(spikeWaveforms(:,25)),100);
+
+for i = 1:length(methods)-2
+    spk_method = find(unique_idx == i);
+    spk_waves_method = spikeWaveforms(spk_method, :);
+    counts(i,:) = histc(spk_waves_method(:,25), binrng);   
+end    
+countss = sum(counts);
+
+tiledlayout(6,1, 'tilespacing','none','padding','none')
+cl = linspecer(length(methods)-1);
+for i = 1:length(methods)-2
+    nexttile
+    bar(binrng, counts(i,:),'facealpha', 1);
+    title(methods{i});
+    if i~=6
+    set(gca,'xcolor','none');
+    end
+    hold on
+    box off
+end
+xlabel("Voltage amplitude ("+char(956)+"V)")
+ylabel('No. entries');
+set(gcf, 'color','w','position',[4,4,8,8]);
+set(findall(gcf,'-property','FontSize'),'FontSize', 14);
+set(findall(gcf,'-property','FontName'),'FontName','Roboto')
+% linkaxes([nexttile(1), nexttile(2), nexttile(3), nexttile(4), nexttile(5), nexttile(6)])
+% exportgraphics(gcf, 'histogram_unique.png','resolution',600);
+%%
+binrng = linspace(min(spikeWaveforms(:,25)),max(spikeWaveforms(:,25)),100);
+
+for i = 1:length(methods)-2
+    spk_method = logical(intersect_matrix(:,i));
+    spk_waves_method = spikeWaveforms(spk_method, :);
+    counts(i,:) = histc(spk_waves_method(:,25), binrng);   
+end    
+% countss = sum(counts);
+
+cl = linspecer(length(methods)-1);
+tiledlayout(6,1, 'tilespacing','none','padding','none')
+cl = linspecer(length(methods)-1);
+for i = 1:length(methods)-2
+    nexttile
+    bar(binrng, counts(i,:),'facealpha', 1,'facecolor',cl(i,:));
+    title(methods{i});
+    if i~=6
+    set(gca,'xcolor','none');
+    end
+    hold on
+    box off
+end
+xlabel("Voltage amplitude ("+char(956)+"V)")
+ylabel('No. entries');
+set(gcf, 'color','w','position',[4,4,8,8]);
+set(findall(gcf,'-property','FontSize'),'FontSize', 14);
+set(findall(gcf,'-property','FontName'),'FontName','Roboto')
+% linkaxes([nexttile(1), nexttile(2), nexttile(3), nexttile(4), nexttile(5), nexttile(6)])
+% exportgraphics(gcf, 'histogram_all.png','resolution',600);
 
 %%
 histogram(spikeWaveforms(:,25));

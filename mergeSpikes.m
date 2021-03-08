@@ -1,4 +1,4 @@
-function [all_spikes, unique_idx] = mergeSpikes(spike_times, option)
+function [all_spikes, unique_idx, intersect_matrix] = mergeSpikes(spike_times, option)
 % Description: Merges spike times across detection methods.
 %----------
 % INPUT
@@ -53,4 +53,5 @@ end
 idx = sum(intersect_matrix,2)>0;
 J = intersect_matrix(idx,:);
 unique_idx = sum(J,2);
+intersect_matrix = intersect_matrix(any(intersect_matrix,2),:);
 end
