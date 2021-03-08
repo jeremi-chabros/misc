@@ -2,7 +2,7 @@ clearvars; clc;
 dataPath = '/Users/jeremi/mea/data/PV-ArchT/';
 addpath(dataPath);
 addpath(genpath('/Users/jeremi/SpikeDetection-Toolbox'));
-file = load('PAT200219_2C_DIV170002.mat');
+file = load('PAT200219_2C_DIV17.mat');
 %%
 
 global fs duration TP FP FN nSamples
@@ -14,7 +14,7 @@ nSamples = 0;
 duration = length(file.dat)/fs;
 
 % channel = randi(60,1);
-channel = 12;
+channel = 19;
 trace_raw = file.dat(1:fs*60, channel);
 spikeTimes = struct;
 
@@ -246,6 +246,27 @@ for i = 1:length(methods)-2
     end
 end
 set(gcf, 'color', 'w');
+
+%% Plot histograms
+tiledlayout(3,3,'tilespacing','none','padding','none')
+for i = 1:length(methods)-2
+    spk_method = find(unique_idx == i);
+    spk_waves_method = spikeWaveforms(spk_method, :);
+%     nexttile
+    hold on;
+    h = histogram(spk_waves_method(:,25),100);
+    h.FaceAlpha = 0.5;
+    h(i) = gca;
+end
+xlim([-20 0])
+linkaxes(h(:),'x');
+legend(methods{1:end-2},'location','bestoutside');
+set(gcf, 'color','w');
+xlabel('Voltage amplitude (\muV)')
+ylabel('No. entries');
+
+%%
+histogram(spikeWaveforms(:,25));
 %% UI functions
 function keys(src, event)
 global TP FP FN nSamples bin_ms
