@@ -3,6 +3,7 @@ dataPath = '/Users/jeremi/mea/data/PV-ArchT/';
 addpath(dataPath);
 addpath(genpath('/Users/jeremi/SpikeDetection-Toolbox'));
 file = load('PAT200219_2C_DIV170002.mat');
+% file = load('200617_slice1.mat');
 %%
 
 global fs duration TP FP FN nSamples
@@ -13,72 +14,51 @@ FN = 0;
 nSamples = 0;
 duration = length(file.dat)/fs;
 
-% channel = randi(60,1);
+channel = randi(60,1);
 channel = 12;
 trace_raw = file.dat(1:fs*60, channel);
 spikeTimes = struct;
 
-Ns = 10;
+Ns = 5;
 multiplier = 2.5;
-wnames = {'mea','bior1.5','bior1.3', 'db2'};
-% wnames = {'mea'};
-Wid = [0.5 0.8];
-L = -0.25;
+% wnames = {'mea','bior1.5','bior1.3', 'db2'};
+wnames = {'mea'};
+Wid = [0.4 0.8];
+L = -0.2;
 nSpikes = 200;
 ttx = 0;
-minPeakThrMultiplier = 2;
+minPeakThrMultiplier = 2.5;
 maxPeakThrMultiplier = 10;
 posPeakThrMultiplier = 10;
 
 % Run CWT spike detection
-% tic
 for wname = wnames
     good_wname = strrep(wname,'.','p');
     
     [spikeTimes.(good_wname{1}), ~, trace] = detectSpikesCWT(...
-    trace_raw, fs, Wid, wname{1}, L, Ns, multiplier, nSpikes, ttx, ...
-    minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
+        trace_raw, fs, Wid, wname{1}, L, Ns, multiplier, nSpikes, ttx, ...
+        minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 end
-% toc
-% %%
-% threshold = mean(trace) - median(abs(trace-mean(trace)));
-% trace_cropped = trace;
-% plot3(zeros(1,length(trace_cropped)),1:length(trace_cropped),trace_cropped,...
-%     'color', 'k',...
-%     'linewidth', 1);
-% 
-% hold on
-% 
-% lineStyles=linspecer(4,'colorblind');
-% spikepos = spikeTimes.mea;
-% % spikepos = spikepos(intersect(spikepos>10000,spikepos<3000));
-% scatter3( zeros(1,length(spikepos)),spikepos, repmat(4*std(trace)-(1*threshold/-7), length(spikepos), 1), 'v', 'filled',...
-%     'markerfacecolor', lineStyles(1,:));
-% 
-% zlim([-20 20]);
-% ylim([1000, 2000]);
-% ylabel('time');
-% zlabel('voltage');
-% set(gca, 'ydir','reverse',...
-%     'xcolor','none');
-% grid on;
+
+%%
+% Threshold spike detection
+[frames, ~, threshold] = detectSpikesThreshold(trace, 3, 0.1, fs, 0);
+[spikeTimes.('threshold'), spike_waves_thr] = alignPeaks(find(frames==1), trace, 10,...
+    1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 
 %%
 % Run SWTTEO spike detection
-% params.filter = 1;
-% in.M = trace_raw;
 params.filter = 0;
 in.M = trace;
+% params.filter = 0;
+% in.M = trace;
 in.SaRa = fs;
-params.method = 'auto';
+params.method = 'numspikes';
+params.numspikes = length(spikeTimes.threshold);
 [spikepos1, ~] = SWTTEO(in,params);
 [spikeTimes.('swtteo'), ~] = alignPeaks(spikepos1, trace, 10,...
     1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 %%
-% Threshold spike detection
-[frames, ~, threshold] = detectSpikesThreshold(trace, 2.5, 0.1, fs, 0);
-[spikeTimes.('threshold'), spike_waves_thr] = alignPeaks(find(frames==1), trace, 10,...
-    1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 
 % Merge spikes from all methods
 unique_idx = [];
@@ -93,7 +73,7 @@ spikeTimes.wavelets = [];
 if numel(wnames) > 1
     [spikeTimes.('wavelets'), ~, ~] = mergeSpikes(spikeTimes, 'wavelets');
 end
-
+    
 %% Plot all spike markers
 
 global bin_ms
@@ -105,9 +85,10 @@ h = plot(trace-mean(trace), 'k', 'linewidth', 1);
 hold on
 
 if numel(wnames) > 1
-admissible = {'threshold', 'wavelets', 'swtteo', 'all'};
+    admissible = {'threshold', 'wavelets', 'swtteo', 'all'};
 else
-    admissible = {'threshold','swtteo','mea', 'all'};
+%     admissible = {'threshold','swtteo','mea', 'all'};
+    admissible = {'threshold','swtteo','mea'};
 end
 lineStyles=linspecer(4,'colorblind');
 
@@ -254,6 +235,11 @@ set(findall(gcf,'-property','FontSize'),'FontSize', 12);
 set(findall(gcf,'-property','FontName'),'FontName','Roboto')
 
 %% Plot histograms
+
+histogram(spikeWaveforms(:, 25),50);
+box off;
+%%
+
 % tiledlayout(3,3,'tilespacing','none','padding','none')
 for i = 1:length(methods)-2
     spk_method = find(unique_idx == i);
@@ -263,35 +249,44 @@ for i = 1:length(methods)-2
     h.FaceAlpha = 0.5;
     h(i) = gca;
 end
-xlim([-20 0])
+hold on
+xl1 = xline(threshold, 'r--', 'Threshold');
+xl1.LineWidth = 2;
+xlim([-inf 0])
 legend(methods{1:end-2},'location','bestoutside');
 set(gcf, 'color','w');
 xlabel('Voltage amplitude (\muV)')
 ylabel('No. entries');
 
 %%
-
-binrng = linspace(min(spikeWaveforms(:,25)),max(spikeWaveforms(:,25)),100);
+figure
+clear counts;
+num_bins = 50;
+binrng = linspace(min(spikeWaveforms(:,25)),max(spikeWaveforms(:,25)),num_bins);
 
 for i = 1:length(methods)-2
     spk_method = find(unique_idx == i);
     spk_waves_method = spikeWaveforms(spk_method, :);
-    counts(i,:) = histc(spk_waves_method(:,25), binrng);   
-end    
+    counts(i,:) = histc(spk_waves_method(:,25), binrng);
+end
 countss = sum(counts);
 
-tiledlayout(6,1, 'tilespacing','none','padding','none')
+tt = tiledlayout(6,1, 'tilespacing','none','padding','none');
+tt.Title.String = 'Unique spikes';
 cl = linspecer(length(methods)-1);
 for i = 1:length(methods)-2
     nexttile
-    bar(binrng, counts(i,:),'facealpha', 1);
+    bar(binrng, counts(i,:),'facealpha', 1, 'facecolor', [.7 .7 .7]);
     title(methods{i});
     if i~=6
-    set(gca,'xcolor','none');
+        set(gca,'xcolor','none');
     end
     hold on
     box off
+    xl1 = xline(threshold, 'r-');
+    xl1.LineWidth = 3;
 end
+
 xlabel("Voltage amplitude ("+char(956)+"V)")
 ylabel('No. entries');
 set(gcf, 'color','w','position',[4,4,8,8]);
@@ -300,27 +295,33 @@ set(findall(gcf,'-property','FontName'),'FontName','Roboto')
 % linkaxes([nexttile(1), nexttile(2), nexttile(3), nexttile(4), nexttile(5), nexttile(6)])
 % exportgraphics(gcf, 'histogram_unique.png','resolution',600);
 %%
-binrng = linspace(min(spikeWaveforms(:,25)),max(spikeWaveforms(:,25)),100);
+clear counts;
+figure
+num_bins = 50;
+binrng = linspace(min(spikeWaveforms(:,25)),max(spikeWaveforms(:,25)),num_bins);
 
 for i = 1:length(methods)-2
     spk_method = logical(intersect_matrix(:,i));
     spk_waves_method = spikeWaveforms(spk_method, :);
-    counts(i,:) = histc(spk_waves_method(:,25), binrng);   
-end    
+    counts(i,:) = histc(spk_waves_method(:,25), binrng);
+end
 % countss = sum(counts);
 
 cl = linspecer(length(methods)-1);
-tiledlayout(6,1, 'tilespacing','none','padding','none')
+tt = tiledlayout(6,1, 'tilespacing','none','padding','none');
+tt.Title.String = 'All spikes';
 cl = linspecer(length(methods)-1);
 for i = 1:length(methods)-2
     nexttile
-    bar(binrng, counts(i,:),'facealpha', 1,'facecolor',cl(i,:));
+    bar(binrng, counts(i,:),'facealpha', 1,'facecolor',[.7 .7 .7]);
     title(methods{i});
     if i~=6
-    set(gca,'xcolor','none');
+        set(gca,'xcolor','none');
     end
     hold on
     box off
+    xl1 = xline(threshold, 'r-');
+    xl1.LineWidth = 3;
 end
 xlabel("Voltage amplitude ("+char(956)+"V)")
 ylabel('No. entries');
@@ -331,7 +332,62 @@ set(findall(gcf,'-property','FontName'),'FontName','Roboto')
 % exportgraphics(gcf, 'histogram_all.png','resolution',600);
 
 %%
-histogram(spikeWaveforms(:,25));
+
+% Get other features
+spikes = spikeWaveforms;
+halfWidth = zeros(length(spikeWaveforms),1);
+peak2peak = zeros(length(spikeWaveforms),1);
+for i = 1:length(spikes)
+    spike = diff(spikeWaveforms(i,:));
+    [pks,locs,W,~] = findpeaks(-spike,'widthreference','halfheight');
+    [nvePeak,pos] = min(-pks);
+    nvePeakPos = locs(pos);
+    halfWidth(i) = W(pos);
+    try
+        [~,locs,~,~] = findpeaks(spike,'widthreference','halfprom','minpeakprominence',-nvePeak/15);
+        pvePeakPos = locs(locs>nvePeakPos);
+        pvePeakPos = pvePeakPos(1);
+        peak2peak(i) = pvePeakPos-nvePeakPos;
+    catch
+        continue
+    end
+end
+
+halfWidth = halfWidth(peak2peak>0);
+peak2peak = peak2peak(peak2peak>0);
+%%
+figre
+tiledlayout(2,1,'tilespacing','none','padding','none')
+nexttile
+histogram(halfWidth,20);
+h1 = gca;
+box off
+axis tight
+xlabel('Half width (ms)');
+
+nexttile
+histogram(peak2peak,20);
+h2 = gca;
+box off
+axis tight
+xlabel('Peak-to-peak (ms)');
+
+linkaxes([h1,h2],'x');
+h2.XTickLabel = h2.XTick/25;
+h1.XTickLabel = h1.XTick/25;
+
+
+
+
+
+
+
+
+
+
+
+
+
 %% UI functions
 function keys(src, event)
 global TP FP FN nSamples bin_ms
