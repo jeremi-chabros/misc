@@ -15,8 +15,9 @@ nSamples = 0;
 duration = length(file.dat)/fs;
 
 channel = randi(60,1);
-channel = 12;
+channel = 38;
 trace_raw = file.dat(1:fs*60, channel);
+% trace_raw = file.dat(:, channel);
 spikeTimes = struct;
 
 Ns = 5;
@@ -24,14 +25,15 @@ multiplier = 2.5;
 % wnames = {'mea','bior1.5','bior1.3', 'db2'};
 wnames = {'mea'};
 Wid = [0.4 0.8];
-L = -0.2;
+L = -0.4;
 nSpikes = 200;
 ttx = 0;
-minPeakThrMultiplier = 2.5;
+minPeakThrMultiplier = 2.3;
 maxPeakThrMultiplier = 10;
 posPeakThrMultiplier = 10;
 
 % Run CWT spike detection
+tic
 for wname = wnames
     good_wname = strrep(wname,'.','p');
     
@@ -39,14 +41,16 @@ for wname = wnames
         trace_raw, fs, Wid, wname{1}, L, Ns, multiplier, nSpikes, ttx, ...
         minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
 end
-
+toc
 %%
+tic
 % Threshold spike detection
-[frames, ~, threshold] = detectSpikesThreshold(trace, 3, 0.1, fs, 0);
+[frames, ~, threshold] = detectSpikesThreshold(trace, 2.5, 0.1, 25000, 0);
 [spikeTimes.('threshold'), spike_waves_thr] = alignPeaks(find(frames==1), trace, 10,...
     1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
-
+toc
 %%
+tic
 % Run SWTTEO spike detection
 params.filter = 0;
 in.M = trace;
@@ -58,21 +62,25 @@ params.numspikes = length(spikeTimes.threshold);
 [spikepos1, ~] = SWTTEO(in,params);
 [spikeTimes.('swtteo'), ~] = alignPeaks(spikepos1, trace, 10,...
     1, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
+spikeTimes.swtteo=intersect(spikeTimes.swtteo, spikeTimes.threshold);
+toc
 %%
 
 % Merge spikes from all methods
 unique_idx = [];
 spikeTimes.all = [];
 spikeTimes.wavelets = [];
-[spikeTimes.('all'), unique_idx, intersect_matrix] = mergeSpikes(spikeTimes, 'all');
+
+[spikeTimes.('all'), unique_idx, intersect_matrix, methods] = mergeSpikes(spikeTimes, 'all');
 
 [~, spikeWaveforms] = alignPeaks(spikeTimes.('all'), trace, 10,...
     0, minPeakThrMultiplier, maxPeakThrMultiplier, posPeakThrMultiplier);
-
+% 
 % Merge spikes from wavelets
 if numel(wnames) > 1
     [spikeTimes.('wavelets'), ~, ~] = mergeSpikes(spikeTimes, 'wavelets');
 end
+
     
 %% Plot all spike markers
 
@@ -85,10 +93,10 @@ h = plot(trace-mean(trace), 'k', 'linewidth', 1);
 hold on
 
 if numel(wnames) > 1
-    admissible = {'threshold', 'wavelets', 'swtteo', 'all'};
+    admissible = {'threshold', 'mea'};
 else
 %     admissible = {'threshold','swtteo','mea', 'all'};
-    admissible = {'threshold','swtteo','mea'};
+    admissible = {'threshold', 'mea'};
 end
 lineStyles=linspecer(4,'colorblind');
 
@@ -100,6 +108,7 @@ end
 
 hold on
 yl = yline(threshold, 'magenta--', "Threshold = " + round(threshold,2) + "\muV");
+% yl = yline(2*threshold, 'magenta--', "Threshold = " + round(2*threshold,2) + "\muV");
 yl.LabelVerticalAlignment = 'bottom';
 yl.LineWidth = 1.5;
 yl.FontSize = 10;
@@ -113,7 +122,11 @@ yl.FontSize = 10;
 st = 1;
 en = st+(bin_ms*25);
 xlim([st en]);
+xlabel('Time (ms)')
+set(gca, 'xticklabels', get(gca, 'xtick')/25);
 ylim([-6*std(trace) 5*std(trace)])
+% ylim([-50 5*std(trace)])
+ylabel('Filtered voltage (a.u.)');
 pbaspect([5 1 1])
 box off
 title("Electrode " + channel)
@@ -141,26 +154,19 @@ figure
 set(gcf,'color','w');
 h = plot(trace-mean(trace), 'k', 'linewidth', 1);
 hold on
-methods = fieldnames(spikeTimes);
+% methods = fieldnames(spikeTimes);
 lineStyles=linspecer(length(methods));
 clear unique_counts
-% unique_counts = table('rownames', methods);
 unique_counts = table;
-
-for m = 1:length(methods)
-    if ~(strcmp(methods{m}, 'all') || strcmp(methods{m}, 'wavelets'))
+for m = 1:length(methods)-2
         spks = spikeTimes.all;
         spikepos = find(unique_idx == m);
         
         scatter(spks(spikepos), repmat(5*std(trace)-(m*threshold/-8), length(spikepos), 1), 'v', 'filled',...
             'markerfacecolor', lineStyles(m,:));
         
-        unique_counts.(methods{m}) = length(spikepos);
-    elseif strcmp(methods{m}, 'all')
-        spikepos = spikeTimes.(methods{m});
-        scatter(spikepos, repmat(5*std(trace)-(m*threshold/-7), length(spikepos), 1), 'v', 'filled',...
-            'markerfacecolor', lineStyles(m,:));
-    end
+        unique_counts.(methods{m}) = length(spks(spikepos));
+
 end
 % unique_counts.Properties.VariableNames = {'No. unique spikes'};
 unique_counts(end-1:end-2,:) = [];
